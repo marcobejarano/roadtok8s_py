@@ -1,13 +1,17 @@
-name: Build and Push Image
+name: Compose - Build, Push & Deploy
 on:
   workflow_dispatch:
   
 jobs:
-  build-push:
+  deploy:
     runs-on: ubuntu-24.04
     env:
       DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
       REPO: ${{ secrets.DOCKERHUB_REPO }}
+      SSH_OPTS: "-o StrictHostKeyChecking=no"
+      REMOTE: "root@${{ secrets. AKAMAI_INSTANCE_IP_ADDRESS }}"
+      REMOTE_APP_DIR: "/opt/app"
+      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
