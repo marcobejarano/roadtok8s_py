@@ -1,0 +1,36 @@
+networks:
+  python_network:
+    driver: bridge
+    name: python_network
+
+services:
+  my-nginx-service:
+    image: nginx
+    container_name: my-nginx-service
+    networks:
+      - python_network
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: roadtok8s-py-web
+    container_name: roadtok8s-py-web
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+    networks:
+      - python_network
+    volumes:
+      - mywebdata:/app/data
+  my-redis-service:
+    image: redis:7.4.1-alpine3.20
+    container_name: my-redis-service
+    networks:
+      - python_network
+
+volumes:
+  mywebdata:
+    name: mywebdata

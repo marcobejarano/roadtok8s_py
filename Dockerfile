@@ -22,7 +22,9 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app /app
 
-RUN chmod +x /app/entrypoint.sh
+# Install redis package (includes both Redis server and redis-cli)
+RUN apk add --no-cache redis && \
+    chmod +x /app/entrypoint.sh
 
 EXPOSE 8080
 
