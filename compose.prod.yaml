@@ -5,6 +5,7 @@ networks:
 
 services:
   web:
+    restart: always
     image: marcobejarano/rk8s-py:${TAG:-latest}
     build:
       context: .
@@ -16,6 +17,8 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
+    env_file:
+      - .env
     networks:
       - python_network
     volumes:
