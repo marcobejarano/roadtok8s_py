@@ -1,8 +1,3 @@
-networks:
-  python_network:
-    driver: bridge
-    name: python_network
-
 services:
   web:
     restart: always
@@ -14,16 +9,26 @@ services:
         - "marcobejarano/rk8s-py:${TAG:-latest}"  
     container_name: "rk8s-py-${TAG:-latest}"
     ports:
-      - "8080:8080"
+      - "80:8080"
     environment:
       - PORT=8080
     env_file:
       - .env
-    networks:
-      - python_network
     volumes:
       - mywebdata:/app/data
+    networks:
+      - python_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   mywebdata:
     name: mywebdata
+    
+networks:
+  python_network:
+    driver: bridge
+    name: python_network

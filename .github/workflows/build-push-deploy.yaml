@@ -9,7 +9,7 @@ jobs:
       DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
       REPO: ${{ secrets.DOCKERHUB_REPO }}
       SSH_OPTS: "-o StrictHostKeyChecking=no"
-      REMOTE: "root@${{ secrets. AKAMAI_INSTANCE_IP_ADDRESS }}"
+      REMOTE: "root@${{ secrets.AKAMAI_INSTANCE_IP_ADDRESS }}"
       REMOTE_APP_DIR: "/opt/app"
       
     steps:
@@ -32,3 +32,82 @@ jobs:
       - name: Push the Docker Image to Docker Hub
         run: |
           docker push "$DH_USER/$REPO" --all-tags
+          
+      - name: Implement the Private SSH Key
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # chmod 600 ensures: Only you (the file owner) can read or modify 
+          # the private key. The key remains secure, meeting SSH's security requirements.
+          
+      - name: Ensure Docker and Docker Compose is installed on VM
+        run: |
+          ssh $SSH_OPTS $REMOTE << EOF
+            set -e
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              rm get-docker.sh
+              # Install Docker Compose
+              sudo apt update
+              sudo apt install -y docker-compose-plugin
+            fi
+          EOF
+          # Everything between << EOF and EOF is passed as input
+            # to the preceding command (ssh in this case).
+          # &> is a Bash redirection operator that redirects both stdout
+            # (standard output) and stderr (standard error) to the specified target.
+          # /dev/null is a special file in Unix-like systems that acts as a
+            # "black hole." Anything written to /dev/null is discarded.
+            
+      - name: Login to Docker Hub on VM
+        run: |
+          ssh $SSH_OPTS $REMOTE << EOF
+            set -e
+            docker login -u $DH_USER -p ${{ secrets.DOCKERHUB_TOKEN }}
+          EOF
+        # Using << EOF groups commands into a block and ensures that they are
+          # passed as input to the ssh session. This means all commands in
+          # the block run on the remote server.
+          
+      - name: Create an .env File
+        run: |
+          echo "MY_SECRET_KEY=${{ secrets.MY_SECRET_KEY }}" >> .env
+          echo "API_ENDPOINT=${{ secrets.API_ENDPOINT }}" >> .env
+          
+      - name: Ensure Remote Directory Exists
+        run: |
+          ssh $SSH_OPTS $REMOTE mkdir -p $REMOTE_APP_DIR
+          
+      - name: Copy GitHub Actions .env File to Remote VM
+        run: |
+          scp $SSH_OPTS .env $REMOTE:$REMOTE_APP_DIR/.env
+          ssh $SSH_OPTS $REMOTE chmod 600 $REMOTE_APP_DIR/.env
+          
+      - name: Copy compose.prod.yaml to VM
+        run: |
+          scp $SSH_OPTS compose.prod.yaml $REMOTE:$REMOTE_APP_DIR/compose.yaml
+      
+      - name: Pull Updated Images
+        run: |
+          ssh $SSH_OPTS $REMOTE << EOF
+            set -e
+            cd $REMOTE_APP_DIR
+            docker compose pull
+          EOF
+          
+      - name: Run Docker Compose
+        run: |
+          ssh $SSH_OPTS $REMOTE << EOF
+            set -e
+            cd $REMOTE_APP_DIR
+            # Run containers
+            docker compose up -d
+          EOF
+      
+      - name: Clean Up .env File
+        run: rm .env
+        
+      - name: Clean Up SSH Private Key
+        run: rm ~/.ssh/id_ed25519
